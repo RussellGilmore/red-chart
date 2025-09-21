@@ -1,0 +1,120 @@
+# Default values for red-chart
+# This is a YAML-formatted file.
+
+# Application configuration
+app:
+  name: "red-app"
+  version: "1.0.0"
+
+# Namespace configuration
+namespace:
+  name: "red-app"
+  create: true
+  labels:
+    istio-injection: enabled
+
+# Image configuration
+image:
+  repository: nginxinc/nginx-unprivileged
+  tag: alpine3.21
+  pullPolicy: IfNotPresent
+
+# Resource configuration
+resources:
+  requests:
+    memory: "64Mi"
+    cpu: "100m"
+  limits:
+    memory: "128Mi"
+    cpu: "200m"
+
+# Security context
+securityContext:
+  runAsUser: 101
+  runAsGroup: 101
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+
+# Domain configuration
+domain:
+  apex: "rag-space.com"
+  subdomain: "red-app"  # Will create red-app.rag-space.com
+  
+# Ingress/Gateway configuration
+gateway:
+  name: "red-app-gateway"
+  namespace: "istio-system"  # Gateway namespace
+  
+# Certificate configuration
+certificate:
+  enabled: true
+  issuer: "letsencrypt-prod"
+  duration: "2160h"  # 90 days
+  renewBefore: "360h"  # 15 days
+
+# Traefik TCP Route configuration
+tcpRoute:
+  enabled: true
+  entryPoint: "websecure"
+
+# Content configuration
+content:
+  # Default HTML content
+  html: |
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Welcome to Red App!</title>
+      <style>
+        body {
+          font-family: Arial, sans-serif;
+          max-width: 800px;
+          margin: 0 auto;
+          padding: 20px;
+          line-height: 1.6;
+        }
+        h1 {
+          color: #e74c3c;
+        }
+        .message {
+          padding: 20px;
+          background-color: #f8f9fa;
+          border-left: 4px solid #e74c3c;
+          margin-bottom: 20px;
+        }
+      </style>
+    </head>
+    <body>
+      <h1>Welcome to {{ .Values.app.name }}!</h1>
+      <div class="message">
+        <p>This application is running in Kubernetes with Istio service mesh.</p>
+      </div>
+      <p>Deployed with Red Chart v{{ .Chart.Version }}</p>
+    </body>
+    </html>
+
+# Pod configuration
+replicaCount: 1
+
+# Node selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity
+affinity: {}
+
+# Pod annotations
+podAnnotations: {}
+
+# Pod labels
+podLabels: {}

@@ -1,0 +1,22 @@
+apiVersion: v2
+name: red-chart
+description: A Helm chart for deploying web applications with Istio service mesh, cert-manager, and Traefik integration
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+home: https://github.com/RussellGilmore/red-charts
+sources:
+  - https://github.com/RussellGilmore/red-charts
+maintainers:
+  - name: Russell Gilmore
+    email: ragilmore775@gmail.com
+keywords:
+  - istio
+  - traefik
+  - cert-manager
+  - nginx
+  - web-app
+annotations:
+  category: Web Applications
+dependencies: []
+kubeVersion: ">=1.20.0"
