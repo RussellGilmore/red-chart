@@ -1,81 +1,116 @@
 # Default values for red-chart
 # This is a YAML-formatted file.
 
-# Application configuration
+# -- Application name
 app:
-  name: "red-app"
+  name: red-app
   version: "1.0.0"
 
-# Namespace configuration
+# -- Namespace configuration
 namespace:
-  name: "red-app"
+  # -- Kubernetes namespace name
+  name: red-app
+  # -- Create namespace if it doesn't exist
   create: true
+  # -- Additional labels for namespace
   labels:
     istio-injection: enabled
 
-# Image configuration
+# -- Container image configuration
 image:
+  # -- Image repository
   repository: nginxinc/nginx-unprivileged
+  # -- Image tag
   tag: alpine3.21
+  # -- Image pull policy
   pullPolicy: IfNotPresent
 
-# Resource configuration
+# -- Number of replicas
+replicaCount: 1
+
+# -- Resource requests and limits
 resources:
   requests:
-    memory: "64Mi"
-    cpu: "100m"
+    memory: 64Mi
+    cpu: 100m
   limits:
-    memory: "128Mi"
-    cpu: "200m"
+    memory: 128Mi
+    cpu: 200m
 
-# Security context
-securityContext:
+# -- Container security context
+containerSecurityContext:
+  runAsNonRoot: true
   runAsUser: 101
   runAsGroup: 101
   allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
   capabilities:
     drop:
       - ALL
+  seccompProfile:
+    type: RuntimeDefault
 
-# Service configuration
+# -- Pod security context
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 101
+  runAsGroup: 101
+  fsGroup: 101
+  seccompProfile:
+    type: RuntimeDefault
+
+# -- Service configuration
 service:
+  # -- Service type
   type: ClusterIP
+  # -- Service port
   port: 80
+  # -- Target container port
   targetPort: 8080
 
-# Domain configuration
+# -- Domain configuration
 domain:
-  apex: "rag-space.com"
-  subdomain: "red-app"  # Will create red-app.rag-space.com
+  # -- Apex domain name
+  apex: rag-space.com
+  # -- Subdomain for application
+  subdomain: red-app
   
-# Ingress/Gateway configuration
+# -- Istio Gateway configuration
 gateway:
-  name: "red-app-gateway"
-  namespace: "istio-system"  # Gateway namespace
+  # -- Gateway name
+  name: red-app-gateway
+  # -- Gateway namespace (typically istio-system)
+  namespace: istio-system
   
-# Certificate configuration
+# -- Certificate configuration
 certificate:
+  # -- Enable cert-manager certificate
   enabled: true
-  issuer: "letsencrypt-prod"
-  duration: "2160h"  # 90 days
-  renewBefore: "360h"  # 15 days
+  # -- ClusterIssuer name
+  issuer: letsencrypt-prod
+  # -- Certificate duration
+  duration: 2160h
+  # -- Certificate renewal time
+  renewBefore: 360h
 
-# Traefik TCP Route configuration
+# -- Traefik TCP Route configuration
 tcpRoute:
+  # -- Enable Traefik TCP route
   enabled: true
-  entryPoint: "websecure"
+  # -- Traefik entry point
+  entryPoint: websecure
 
-# Content configuration
+# -- Content configuration
 content:
-  # Default HTML content
+  # -- HTML content for the application
   html: |
     <!DOCTYPE html>
     <html>
     <head>
-      <title>Welcome to Red App!</title>
+      <title>Welcome to {{ .Values.app.name }}!</title>
       <style>
         body {
-          font-family: Arial, sans-serif;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
           max-width: 800px;
           margin: 0 auto;
           padding: 20px;
@@ -101,20 +136,37 @@ content:
     </body>
     </html>
 
-# Pod configuration
-replicaCount: 1
+# -- Health probe configuration
+livenessProbe:
+  httpGet:
+    path: /
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 30
+  timeoutSeconds: 5
+  failureThreshold: 3
 
-# Node selector
-nodeSelector: {}
+# -- Readiness probe configuration
+readinessProbe:
+  httpGet:
+    path: /
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  timeoutSeconds: 3
+  failureThreshold: 3
 
-# Tolerations
-tolerations: []
-
-# Affinity
-affinity: {}
-
-# Pod annotations
+# -- Pod annotations
 podAnnotations: {}
 
-# Pod labels
+# -- Pod labels
 podLabels: {}
+
+# -- Node selector
+nodeSelector: {}
+
+# -- Tolerations
+tolerations: []
+
+# -- Affinity rules
+affinity: {}
