@@ -1,0 +1,25 @@
+# Helm
+*.tgz
+.cr-release-packages/
+.cr-index/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+
+# Log files
+*.log
+
+# Local development
+values-local.yaml
+*-local.yaml
