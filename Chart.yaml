@@ -18,5 +18,4 @@ keywords:
   - web-app
 annotations:
   category: Web Applications
-dependencies: []
-kubeVersion: ">=1.20.0"
+kubeVersion: ">=1.24.0-0"
