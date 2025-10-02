@@ -74,14 +74,14 @@ domain:
   apex: rag-space.com
   # -- Subdomain for application
   subdomain: red-app
-  
+
 # -- Istio Gateway configuration
 gateway:
   # -- Gateway name
   name: red-app-gateway
   # -- Gateway namespace (typically istio-system)
   namespace: istio-system
-  
+
 # -- Certificate configuration
 certificate:
   # -- Enable cert-manager certificate

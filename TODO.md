@@ -1,3 +1,3 @@
 # TODO List
 
-- [ ] Chart Testing 
+-   [ ] Chart Testing
