@@ -1,0 +1,23 @@
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: {{ include "red-chart.fullname" . }}-vs
+  namespace: {{ .Values.namespace.name | quote }}
+  labels:
+    {{- include "red-chart.labels" . | nindent 4 }}
+    app.kubernetes.io/component: virtualservice
+spec:
+  hosts:
+    - {{ include "red-chart.fqdn" . | quote }}
+  gateways:
+    - {{ .Values.gateway.namespace }}/{{ .Values.gateway.name }}
+  http:
+    - match:
+        - uri:
+            prefix: /
+      route:
+        - destination:
+            host: {{ include "red-chart.fullname" . }}.{{ .Values.namespace.name }}.svc.cluster.local
+            port:
+              number: {{ .Values.service.port }}
