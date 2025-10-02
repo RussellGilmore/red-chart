@@ -1,0 +1,26 @@
+{{- if .Values.certificate.enabled }}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "red-chart.fullname" . }}-cert
+  namespace: {{ .Values.gateway.namespace | quote }}
+  labels:
+    {{- include "red-chart.labels" . | nindent 4 }}
+    app.kubernetes.io/component: certificate
+spec:
+  secretName: {{ include "red-chart.fullname" . }}-cert-tls
+  duration: {{ .Values.certificate.duration | quote }}
+  renewBefore: {{ .Values.certificate.renewBefore | quote }}
+  isCA: false
+  privateKey:
+    algorithm: RSA
+    encoding: PKCS1
+    size: 2048
+  dnsNames:
+    - {{ include "red-chart.fqdn" . }}
+  issuerRef:
+    name: {{ .Values.certificate.issuer }}
+    kind: ClusterIssuer
+    group: cert-manager.io
+{{- end }}
