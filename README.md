@@ -1,5 +1,8 @@
 # Red Charts
 
+> **⚠️ WORK IN PROGRESS**: This project is under heavy development and is not
+> yet ready for production use.
+
 > Modern Helm charts for deploying web applications with Istio service mesh,
 > cert-manager, and Traefik integration.
 
@@ -292,16 +295,3 @@ kubectl logs -n <namespace> <pod-name>
 # Check events
 kubectl get events -n <namespace> --sort-by='.lastTimestamp'
 ```
-
-## Security
-
-### Security Features
-
--   ✅ **Non-root containers**: Runs as UID 101
--   ✅ **Read-only root filesystem**: Immutable container
--   ✅ **Dropped capabilities**: All Linux capabilities removed
--   ✅ **Seccomp profile**: RuntimeDefault enforced
--   ✅ **Resource limits**: Memory and CPU constrained
--   ✅ **Security contexts**: Pod and container level
--   ✅ **TLS encryption**: Automatic HTTPS with valid certificates
--   ✅ **Pod Security Standards**: Restricted policy compliant
