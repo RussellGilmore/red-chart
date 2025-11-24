@@ -7,13 +7,20 @@
 values-local.yaml
 *-local.yaml
 
-############### Terraform ###############
+############### Terraform & Terragrunt ###############
+# Terragrunt cache directories
+.terragrunt-cache/
+**/.terragrunt-cache/
+
 # Local .terraform directories
 **/.terraform/*
 
 # .tfstate files
 *.tfstate
 *.tfstate.*
+*.tfstate.backup
+
+# Terraform lock files
 **/.terraform.lock.hcl
 
 # Crash log files
@@ -27,6 +34,10 @@ crash.*.log
 *.tfvars
 *.tfvars.json
 
+# But allow example files
+!example.tfvars
+!*.example.tfvars
+
 # Ignore override files as they are usually used to override resources locally and so
 # are not checked in
 override.tf
@@ -38,11 +49,16 @@ override.tf.json
 # !example_override.tf
 
 # Include tfplan files to ignore the plan output of command: terraform plan -out=tfplan
-# example: *tfplan*
+*.tfplan
+*plan.out
 
 # Ignore CLI configuration files
 .terraformrc
 terraform.rc
+
+# Backup files
+*.bak
+*.backup
 
 ############### Golang ###############
 # Binaries for programs and plugins
@@ -72,6 +88,9 @@ go.work
 !.vscode/extensions.json
 !.vscode/*.code-snippets
 
+# Stores VSCode versions used for testing VSCode extensions
+.vscode-test
+
 ############### Docusaurus ###############
 # Build output
 build/
@@ -83,6 +102,12 @@ build/
 
 ############### OS ###############
 .DS_Store
+
+# IDE and editor files
+.idea/
+*.swp
+*.swo
+*~
 
 ############# Module #############
 # Ignore all files in the site directory
