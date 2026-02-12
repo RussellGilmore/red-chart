@@ -18,6 +18,8 @@ namespace:
 
 # -- Container image configuration
 image:
+  # -- Image pull secrets for private registries
+  imagePullSecrets: []
   # -- Image repository
   repository: nginxinc/nginx-unprivileged
   # -- Image tag
