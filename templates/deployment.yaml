@@ -37,8 +37,10 @@ spec:
               containerPort: {{ .Values.service.targetPort }}
               protocol: TCP
           volumeMounts:
+            {{- if .Values.content.html }}
             - name: content-volume
               mountPath: /usr/share/nginx/html/
+            {{- end }}
             - name: tmp
               mountPath: /tmp
             - name: cache
@@ -52,9 +54,11 @@ spec:
           readinessProbe:
             {{- toYaml .Values.readinessProbe | nindent 12 }}
       volumes:
+        {{- if .Values.content.html }}
         - name: content-volume
           configMap:
             name: {{ include "red-chart.fullname" . }}-config
+        {{- end }}
         - name: tmp
           emptyDir: {}
         - name: cache

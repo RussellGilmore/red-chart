@@ -1,3 +1,4 @@
+{{- if .Values.content.html }}
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -9,3 +10,4 @@ metadata:
 data:
   index.html: |
     {{- tpl .Values.content.html . | nindent 4 }}
+{{- end }}
