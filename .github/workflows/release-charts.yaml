@@ -23,18 +23,45 @@ jobs:
           git config user.name "$GITHUB_ACTOR"
           git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
 
-      - name: Create gh-pages branch if it doesn't exist
+      - name: Ensure gh-pages branch exists
         run: |
-          if ! git ls-remote --heads origin gh-pages | grep -q gh-pages; then
-            echo "Creating gh-pages branch..."
-            git checkout --orphan gh-pages
-            git rm -rf .
-            git commit --allow-empty -m "Initialize gh-pages branch"
-            git push origin gh-pages
-            git checkout main
-          else
+          # Fetch all branches to check if gh-pages exists
+          git fetch origin
+
+          # Check if gh-pages exists on remote
+          if git ls-remote --exit-code --heads origin gh-pages > /dev/null 2>&1; then
             echo "gh-pages branch already exists"
+          else
+            echo "Creating gh-pages branch..."
+
+            # Create orphan branch (no history)
+            git checkout --orphan gh-pages
+
+            # Remove all files from staging
+            git rm -rf . || true
+
+            # Create initial index.yaml for Helm repo
+            cat > index.yaml <<EOF
+          apiVersion: v1
+          entries: {}
+          generated: "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          EOF
+
+            # Add and commit
+            git add index.yaml
+            git commit -m "Initialize gh-pages branch with empty Helm repo index"
+
+            # Push the new branch
+            git push -u origin gh-pages
+
+            echo "gh-pages branch created successfully"
+
+            # Switch back to main
+            git checkout main
           fi
+
+          # Ensure we have the latest refs
+          git fetch origin gh-pages
 
       - name: Install Helm
         uses: azure/setup-helm@v4.3.1
