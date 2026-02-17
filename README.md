@@ -1,6 +1,6 @@
-# Red Charts
+# Red Chart
 
-> Modern Helm charts for deploying web applications with Istio service mesh,
+> Modern Helm chart for deploying web applications with Istio service mesh,
 > cert-manager, and Traefik integration.
 
 [![Helm](https://img.shields.io/badge/Helm-v3.8%2B-blue)](https://helm.sh)
@@ -9,7 +9,7 @@
 
 ## Overview
 
-Red Charts provides a production-ready Helm chart pattern for deploying web
+Red Chart provides a production-ready Helm chart pattern for deploying web
 applications on Kubernetes with a modern service mesh architecture. The chart
 handles all the complexity of integrating Istio, cert-manager, and Traefik,
 allowing you to deploy secure, TLS-enabled applications with a single command.
@@ -27,9 +27,46 @@ allowing you to deploy secure, TLS-enabled applications with a single command.
 -   ⚡ **Production Ready**: Health probes, resource limits, and security
     contexts included
 
+## Installation
+
+### Add the Helm Repository
+
+```bash
+helm repo add red-charts https://russellgilmore.github.io/red-chart
+helm repo update
+```
+
+### Search for Available Charts
+
+```bash
+helm search repo red-charts
+```
+
+### Install the Chart
+
+```bash
+# Basic installation
+helm install my-app red-charts/red-chart \
+  --set domain.apex=yourdomain.com \
+  --set domain.subdomain=app
+
+# Install with custom values file
+helm install my-app red-charts/red-chart -f values.yaml
+```
+
+### Pull the Chart Locally
+
+```bash
+# Download the chart package
+helm pull red-charts/red-chart
+
+# Download and extract
+helm pull red-charts/red-chart --untar
+```
+
 ## Prerequisites
 
-Before using Red Charts, ensure your cluster has:
+Before using Red Chart, ensure your cluster has:
 
 -   **Kubernetes 1.24+**
 -   **Helm 3.8+**
@@ -38,40 +75,56 @@ Before using Red Charts, ensure your cluster has:
 -   **Traefik 2.0+** (as ingress controller)
 -   **ClusterIssuer configured** (default: `letsencrypt-prod`)
 
-## Quick Start
+## Quick Start Examples
 
-### Installation
+### Deploy a Simple Web App
 
 ```bash
-# Clone the repository
-git clone https://github.com/RussellGilmore/red-charts.git
-cd red-charts
-
-# Install with default values
-helm install my-app charts/red-chart \
-  --set domain.apex=yourdomain.com \
-  --set domain.subdomain=app
-
-# Install with custom values file
-helm install red-app charts/red-chart -f examples/red-app-values.yaml
+helm install my-app red-charts/red-chart \
+  --set domain.apex=example.com \
+  --set domain.subdomain=app \
+  --set image.repository=nginx \
+  --set image.tag=alpine
 ```
 
-### Example Deployments
+### Deploy with Custom HTML Content
 
-#### Deploy Red App
+Create a `values.yaml`:
 
-```bash
-helm install red-app charts/red-chart \
-  --values examples/red-app-values.yaml \
-  --set domain.apex=yourdomain.com
+```yaml
+domain:
+    apex: example.com
+    subdomain: myapp
+
+content:
+    html: |
+        <!DOCTYPE html>
+        <html>
+        <head><title>My App</title></head>
+        <body><h1>Hello World!</h1></body>
+        </html>
 ```
 
-#### Deploy Red Cards
+Install:
 
 ```bash
-helm install red-cards charts/red-chart \
-  --values examples/red-cards-values.yaml \
-  --set domain.apex=yourdomain.com
+helm install my-app red-charts/red-chart -f values.yaml
+```
+
+### Deploy a Container Image from Private Registry
+
+```yaml
+image:
+    repository: registry.example.com/my-app
+    tag: latest
+    pullPolicy: Always
+
+imagePullSecrets:
+    - name: my-registry-secret
+
+domain:
+    apex: example.com
+    subdomain: app
 ```
 
 ## Architecture
@@ -105,18 +158,9 @@ helm install red-cards charts/red-chart \
                      │
                      ▼
             ┌─────────────────┐
-            │   Nginx Pod     │  (Application)
-            │  (ConfigMap)    │
+            │   Your App      │  (Pods)
             └─────────────────┘
 ```
-
-### Component Flow
-
-1. **Client Request** → Traefik (TCP Route with SNI matching)
-2. **Traefik** → Istio Gateway (TLS termination using cert-manager certificate)
-3. **Gateway** → VirtualService (HTTP routing rules)
-4. **VirtualService** → Kubernetes Service (load balancing)
-5. **Service** → Nginx Pods (serving content from ConfigMap)
 
 ## Configuration
 
@@ -145,41 +189,11 @@ helm install red-cards charts/red-chart \
 | `certificate.duration` | Certificate validity | `2160h` (90 days)  |
 | `tcpRoute.enabled`     | Enable Traefik route | `true`             |
 
-### Resources & Security
-
-| Parameter                            | Description          | Default |
-| ------------------------------------ | -------------------- | ------- |
-| `resources.requests.memory`          | Memory request       | `64Mi`  |
-| `resources.requests.cpu`             | CPU request          | `100m`  |
-| `resources.limits.memory`            | Memory limit         | `128Mi` |
-| `resources.limits.cpu`               | CPU limit            | `200m`  |
-| `containerSecurityContext.runAsUser` | Container UID        | `101`   |
-| `podSecurityContext.fsGroup`         | Volume ownership GID | `101`   |
-
-### Custom HTML Content
-
-Customize your application content through `values.yaml`:
-
-```yaml
-content:
-    html: |
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>My Custom App</title>
-        </head>
-        <body>
-          <h1>Welcome to {{ .Values.app.name }}!</h1>
-          <p>Custom content here...</p>
-        </body>
-        </html>
-```
+For a complete list of configuration options, see [values.yaml](values.yaml).
 
 ## Advanced Usage
 
 ### Production Configuration
-
-Create a production values file:
 
 ```yaml
 # values-production.yaml
@@ -207,32 +221,51 @@ affinity:
                   topologyKey: kubernetes.io/hostname
 ```
 
-Deploy with:
+Deploy:
 
 ```bash
-helm install my-app charts/red-chart \
-  -f values-production.yaml \
-  --set domain.apex=production.com \
-  --set domain.subdomain=app
+helm install my-app red-charts/red-chart -f values-production.yaml
 ```
 
 ### Multi-Environment Deployments
 
 ```bash
 # Development
-helm install red-app-dev charts/red-chart \
+helm install my-app-dev red-charts/red-chart \
   -f values-dev.yaml \
   --namespace dev
 
 # Staging
-helm install red-app-staging charts/red-chart \
+helm install my-app-staging red-charts/red-chart \
   -f values-staging.yaml \
   --namespace staging
 
 # Production
-helm install red-app-prod charts/red-chart \
+helm install my-app-prod red-charts/red-chart \
   -f values-production.yaml \
   --namespace production
+```
+
+### Upgrading
+
+```bash
+# Update repository
+helm repo update
+
+# Check for new versions
+helm search repo red-charts/red-chart --versions
+
+# Upgrade to latest version
+helm upgrade my-app red-charts/red-chart
+
+# Upgrade to specific version
+helm upgrade my-app red-charts/red-chart --version 0.1.2
+```
+
+### Uninstalling
+
+```bash
+helm uninstall my-app
 ```
 
 ## Troubleshooting
@@ -268,17 +301,6 @@ kubectl get virtualservice -n <namespace>
 kubectl describe virtualservice <vs-name> -n <namespace>
 ```
 
-### Traefik Routing Issues
-
-```bash
-# Check IngressRouteTCP
-kubectl get ingressroutetcp -n istio-system
-kubectl describe ingressroutetcp <route-name> -n istio-system
-
-# Verify Traefik logs
-kubectl logs -n traefik deployment/traefik
-```
-
 ### Application Not Starting
 
 ```bash
@@ -292,3 +314,22 @@ kubectl logs -n <namespace> <pod-name>
 # Check events
 kubectl get events -n <namespace> --sort-by='.lastTimestamp'
 ```
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
+for details.
+
+## Maintainers
+
+-   Russell Gilmore - [Russell.Gilmore@pm.me](mailto:Russell.Gilmore@pm.me)
+
+## Links
+
+-   [Chart Repository](https://russellgilmore.github.io/red-chart)
+-   [Source Code](https://github.com/RussellGilmore/red-chart)
+-   [Issues](https://github.com/RussellGilmore/red-chart/issues)
