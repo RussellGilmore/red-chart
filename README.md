@@ -6,6 +6,7 @@
 [![Helm](https://img.shields.io/badge/Helm-v3.8%2B-blue)](https://helm.sh)
 [![Kubernetes](https://img.shields.io/badge/Kubernetes-v1.24%2B-blue)](https://kubernetes.io)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Release Charts](https://github.com/RussellGilmore/red-chart/actions/workflows/release-charts.yaml/badge.svg)](https://github.com/RussellGilmore/red-chart/actions/workflows/release-charts.yaml)
 
 ## Overview
 
@@ -24,6 +25,8 @@ allowing you to deploy secure, TLS-enabled applications with a single command.
 -   🛡️ **Security First**: Pod Security Standards compliant, runs as non-root
 -   📦 **Single Chart, Multiple Apps**: Deploy different applications using the
     same pattern
+-   📦 **Container Ready**: Supports both static HTML via ConfigMap and
+    containerized applications
 -   ⚡ **Production Ready**: Health probes, resource limits, and security
     contexts included
 
@@ -77,15 +80,15 @@ Before using Red Chart, ensure your cluster has:
 
 ## Quick Start Examples
 
-### Deploy a Simple Web App
+### Deploy a Simple Static Web App
 
 ```bash
 helm install my-app red-charts/red-chart \
   --set domain.apex=example.com \
-  --set domain.subdomain=app \
-  --set image.repository=nginx \
-  --set image.tag=alpine
+  --set domain.subdomain=app
 ```
+
+This uses the default static HTML content from the chart.
 
 ### Deploy with Custom HTML Content
 
@@ -111,7 +114,38 @@ Install:
 helm install my-app red-charts/red-chart -f values.yaml
 ```
 
-### Deploy a Container Image from Private Registry
+### Deploy a Containerized Application
+
+For applications built as container images (like React apps):
+
+```yaml
+app:
+    name: my-react-app
+
+image:
+    repository: registry.example.com/my-app
+    tag: v1.0.0
+    pullPolicy: Always
+
+domain:
+    apex: example.com
+    subdomain: app
+# Don't set content.html - use the app from the container
+```
+
+### Deploy from Private Registry
+
+Create image pull secret first:
+
+```bash
+kubectl create secret docker-registry my-registry-secret \
+  --docker-server=registry.example.com \
+  --docker-username=user \
+  --docker-password=pass \
+  --namespace=my-namespace
+```
+
+Then in `values.yaml`:
 
 ```yaml
 image:
@@ -129,6 +163,8 @@ domain:
 
 ## Architecture
 
+This chart uses **Istio Gateway and VirtualService** for routing.
+
 ```
 ┌─────────────────────────────────────────────────────┐
 │                     Internet                         │
@@ -136,31 +172,40 @@ domain:
                      │
                      ▼
             ┌─────────────────┐
-            │     Traefik     │  (TCP Route with SNI)
+            │     Traefik     │  (Layer 4: TCP/SNI)
             │  Ingress / LB   │
             └────────┬────────┘
                      │
                      ▼
             ┌─────────────────┐
-            │  Istio Gateway  │  (TLS Termination)
-            │  (istio-system) │
+            │  Istio Gateway  │  (Layer 7: TLS Termination)
+            │  (istio-system) │  (cert-manager certificate)
             └────────┬────────┘
                      │
                      ▼
             ┌─────────────────┐
-            │ VirtualService  │  (HTTP Routing)
+            │ VirtualService  │  (HTTP Routing Rules)
             └────────┬────────┘
                      │
                      ▼
             ┌─────────────────┐
-            │ K8s Service     │
+            │ K8s Service     │  (Load Balancing)
             └────────┬────────┘
                      │
                      ▼
             ┌─────────────────┐
-            │   Your App      │  (Pods)
+            │   Your App      │  (Application Pods)
+            │    (Pods)       │
             └─────────────────┘
 ```
+
+**Traffic Flow:**
+
+1. Client makes HTTPS request → Traefik (SNI passthrough on port 443)
+2. Traefik → Istio Gateway (TLS termination using cert-manager certificate)
+3. Istio Gateway → VirtualService (HTTP routing based on hostname/path)
+4. VirtualService → Kubernetes Service (ClusterIP)
+5. Service → Application Pods (your containerized app or static content)
 
 ## Configuration
 
@@ -176,7 +221,19 @@ domain:
 | `domain.subdomain` | Application subdomain          | `red-app`                     |
 | `image.repository` | Container image                | `nginxinc/nginx-unprivileged` |
 | `image.tag`        | Image tag                      | `alpine3.21`                  |
+| `image.pullPolicy` | Image pull policy              | `IfNotPresent`                |
+| `imagePullSecrets` | Image pull secrets             | `[]`                          |
 | `replicaCount`     | Number of replicas             | `1`                           |
+
+### Content Configuration
+
+| Parameter      | Description                       | Default              |
+| -------------- | --------------------------------- | -------------------- |
+| `content.html` | Static HTML content via ConfigMap | Default welcome page |
+
+**Note:** If `content.html` is not set (or set to empty string), the chart will
+use the content from your container image. This is ideal for deploying
+containerized applications.
 
 ### Gateway & Certificates
 
@@ -188,6 +245,17 @@ domain:
 | `certificate.issuer`   | ClusterIssuer name   | `letsencrypt-prod` |
 | `certificate.duration` | Certificate validity | `2160h` (90 days)  |
 | `tcpRoute.enabled`     | Enable Traefik route | `true`             |
+
+### Resources & Security
+
+| Parameter                            | Description          | Default |
+| ------------------------------------ | -------------------- | ------- |
+| `resources.requests.memory`          | Memory request       | `64Mi`  |
+| `resources.requests.cpu`             | CPU request          | `100m`  |
+| `resources.limits.memory`            | Memory limit         | `128Mi` |
+| `resources.limits.cpu`               | CPU limit            | `200m`  |
+| `containerSecurityContext.runAsUser` | Container UID        | `101`   |
+| `podSecurityContext.fsGroup`         | Volume ownership GID | `101`   |
 
 For a complete list of configuration options, see [values.yaml](values.yaml).
 
@@ -233,17 +301,20 @@ helm install my-app red-charts/red-chart -f values-production.yaml
 # Development
 helm install my-app-dev red-charts/red-chart \
   -f values-dev.yaml \
-  --namespace dev
+  --namespace dev \
+  --create-namespace
 
 # Staging
 helm install my-app-staging red-charts/red-chart \
   -f values-staging.yaml \
-  --namespace staging
+  --namespace staging \
+  --create-namespace
 
 # Production
 helm install my-app-prod red-charts/red-chart \
   -f values-production.yaml \
-  --namespace production
+  --namespace production \
+  --create-namespace
 ```
 
 ### Upgrading
@@ -260,12 +331,20 @@ helm upgrade my-app red-charts/red-chart
 
 # Upgrade to specific version
 helm upgrade my-app red-charts/red-chart --version 0.1.2
+
+# Upgrade with new values
+helm upgrade my-app red-charts/red-chart -f values.yaml
 ```
 
 ### Uninstalling
 
 ```bash
+# Uninstall the release
 helm uninstall my-app
+
+# Uninstall and delete namespace
+helm uninstall my-app --namespace my-namespace
+kubectl delete namespace my-namespace
 ```
 
 ## Troubleshooting
@@ -301,6 +380,17 @@ kubectl get virtualservice -n <namespace>
 kubectl describe virtualservice <vs-name> -n <namespace>
 ```
 
+### Traefik Routing Issues
+
+```bash
+# Check IngressRouteTCP
+kubectl get ingressroutetcp -n istio-system
+kubectl describe ingressroutetcp <route-name> -n istio-system
+
+# Verify Traefik logs
+kubectl logs -n traefik deployment/traefik
+```
+
 ### Application Not Starting
 
 ```bash
@@ -315,9 +405,49 @@ kubectl logs -n <namespace> <pod-name>
 kubectl get events -n <namespace> --sort-by='.lastTimestamp'
 ```
 
+## Chart Versions
+
+To see all available versions:
+
+```bash
+helm search repo red-charts/red-chart --versions
+```
+
+## Development
+
+### Local Development
+
+```bash
+# Clone the repository
+git clone https://github.com/RussellGilmore/red-chart.git
+cd red-chart
+
+# Test the chart
+helm lint .
+
+# Dry-run install
+helm install test-release . --dry-run --debug
+
+# Install locally
+helm install test-release .
+```
+
+### Making Changes
+
+1. Make your changes to the chart
+2. Bump the version in `Chart.yaml`
+3. Commit and push to `main` branch
+4. GitHub Actions will automatically package and publish the new version
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
 ## License
 
@@ -326,10 +456,11 @@ for details.
 
 ## Maintainers
 
--   Russell Gilmore - [Russell.Gilmore@pm.me](mailto:Russell.Gilmore@pm.me)
+-   Russell Gilmore - [ragilmore775@gmail.com](mailto:ragilmore775@gmail.com)
 
 ## Links
 
 -   [Chart Repository](https://russellgilmore.github.io/red-chart)
 -   [Source Code](https://github.com/RussellGilmore/red-chart)
 -   [Issues](https://github.com/RussellGilmore/red-chart/issues)
+-   [Releases](https://github.com/RussellGilmore/red-chart/releases)
