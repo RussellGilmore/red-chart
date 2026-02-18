@@ -14,3 +14,8 @@ repos:
         name: Prettier
         args: [--prose-wrap=always]
         types_or: [markdown]
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.0
+    hooks:
+      - id: gitleaks
+        name: Gitleaks Scanner
