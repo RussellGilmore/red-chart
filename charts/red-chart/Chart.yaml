@@ -2,7 +2,7 @@ apiVersion: v2
 name: red-chart
 description: A Helm chart for deploying web applications with Istio service mesh, cert-manager, and Traefik integration
 type: application
-version: 0.1.2
+version: 0.1.3
 appVersion: "1.0.0"
 home: https://github.com/RussellGilmore/red-charts
 sources:
