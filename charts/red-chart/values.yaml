@@ -77,12 +77,22 @@ domain:
   # -- Subdomain for application
   subdomain: red-app
 
+# -- Routing mode: "legacy" uses Istio Gateway + VirtualService,
+# -- "gatewayapi" uses Kubernetes Gateway API + HTTPRoute
+routingMode: legacy
+
 # -- Istio Gateway configuration
 gateway:
   # -- Gateway name
   name: red-app-gateway
   # -- Gateway namespace (typically istio-system)
   namespace: istio-system
+  # -- Gateway API class name (only used when routingMode is "gatewayapi")
+  className: istio
+  # -- Additional annotations for the Gateway resource (only used when routingMode is "gatewayapi")
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    networking.istio.io/service-type: ClusterIP
 
 # -- Certificate configuration
 certificate:

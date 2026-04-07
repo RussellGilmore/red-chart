@@ -56,3 +56,30 @@ Generate the full domain name
 {{- define "red-chart.fqdn" -}}
 {{- printf "%s.%s" .Values.domain.subdomain .Values.domain.apex }}
 {{- end }}
+
+{{/*
+Compute the Traefik TCP route target service name.
+Legacy mode targets the shared istio-ingressgateway.
+Gateway API mode targets the auto-generated <gateway-name>-istio service.
+*/}}
+{{- define "red-chart.tcpRouteServiceName" -}}
+{{- if eq .Values.routingMode "gatewayapi" -}}
+{{- printf "%s-istio" .Values.gateway.name -}}
+{{- else -}}
+istio-ingressgateway
+{{- end -}}
+{{- end }}
+
+{{/*
+Check if routing mode is legacy.
+*/}}
+{{- define "red-chart.isLegacy" -}}
+{{- eq .Values.routingMode "legacy" -}}
+{{- end }}
+
+{{/*
+Check if routing mode is gatewayapi.
+*/}}
+{{- define "red-chart.isGatewayAPI" -}}
+{{- eq .Values.routingMode "gatewayapi" -}}
+{{- end }}
