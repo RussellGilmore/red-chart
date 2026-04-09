@@ -14,7 +14,7 @@ spec:
   routes:
     - match: HostSNI(`{{ include "red-chart.fqdn" . }}`)
       services:
-        - name: istio-ingressgateway
+        - name: {{ include "red-chart.tcpRouteServiceName" . }}
           port: 443
   tls:
     passthrough: true

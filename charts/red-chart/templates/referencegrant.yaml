@@ -1,0 +1,21 @@
+{{- if eq .Values.routingMode "gatewayapi" }}
+---
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: {{ include "red-chart.fullname" . }}-ref-grant
+  namespace: {{ .Values.gateway.namespace | quote }}
+  labels:
+    {{- include "red-chart.labels" . | nindent 4 }}
+    app.kubernetes.io/component: referencegrant
+spec:
+  from:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: {{ .Values.namespace.name }}
+  to:
+    - group: ""
+      kind: Service
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+{{- end }}
