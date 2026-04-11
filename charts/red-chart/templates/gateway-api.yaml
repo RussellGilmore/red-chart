@@ -5,10 +5,15 @@ kind: Gateway
 metadata:
   name: {{ .Values.gateway.name }}
   namespace: {{ .Values.gateway.namespace | quote }}
-  {{- with .Values.gateway.annotations }}
   annotations:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
+    {{- if not .Values.certificate.enabled }}
+    cert-manager.io/cluster-issuer: {{ .Values.certificate.issuer }}
+    {{- end }}
+    {{- range $key, $val := .Values.gateway.annotations }}
+    {{- if or $.Values.certificate.enabled (ne $key "cert-manager.io/cluster-issuer") }}
+    {{ $key }}: {{ $val | quote }}
+    {{- end }}
+    {{- end }}
   labels:
     {{- include "red-chart.labels" . | nindent 4 }}
     app.kubernetes.io/component: gateway

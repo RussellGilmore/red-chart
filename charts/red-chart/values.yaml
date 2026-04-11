@@ -96,13 +96,16 @@ gateway:
 
 # -- Certificate configuration
 certificate:
-  # -- Enable cert-manager certificate
+  # -- Enable explicit cert-manager Certificate resource.
+  # -- In "legacy" mode this is required and defaults to true.
+  # -- In "gatewayapi" mode the Gateway annotation can handle provisioning,
+  # -- so this defaults to false. Set to true to create an explicit Certificate anyway.
   enabled: true
   # -- ClusterIssuer name
   issuer: letsencrypt-prod
-  # -- Certificate duration
+  # -- Certificate duration (only used when certificate.enabled is true)
   duration: 2160h
-  # -- Certificate renewal time
+  # -- Certificate renewal time (only used when certificate.enabled is true)
   renewBefore: 360h
 
 # -- Traefik TCP Route configuration
