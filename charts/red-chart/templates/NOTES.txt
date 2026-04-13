@@ -3,6 +3,7 @@
 Application: {{ .Values.app.name }}
 Namespace: {{ .Values.namespace.name }}
 Release: {{ .Release.Name }}
+Routing Mode: {{ .Values.routingMode }}
 
 🌐 Your application will be available at:
    https://{{ include "red-chart.fqdn" . }}
@@ -13,22 +14,51 @@ Release: {{ .Release.Name }}
 {{- end }}
    ✓ Deployment: {{ include "red-chart.fullname" . }}
    ✓ Service: {{ include "red-chart.fullname" . }}
+{{- if .Values.content.html }}
    ✓ ConfigMap: {{ include "red-chart.fullname" . }}-config
+{{- end }}
+
+{{- if eq .Values.routingMode "legacy" }}
    ✓ Istio Gateway: {{ .Values.gateway.namespace }}/{{ .Values.gateway.name }}
-   ✓ Istio VirtualService: {{ include "red-chart.fullname" . }}-vs
+   ✓ Istio VirtualService: {{ include "red-chart.fullname" . }}
+{{- else }}
+   ✓ Gateway API Gateway: {{ .Values.gateway.namespace }}/{{ .Values.gateway.name }}
+   ✓ HTTPRoute: {{ include "red-chart.fullname" . }}
+   ✓ HTTPRoute (redirect): {{ include "red-chart.fullname" . }}-redirect
+   ✓ ReferenceGrant: {{ include "red-chart.fullname" . }}-ref-grant
+{{- end }}
+
 {{- if .Values.certificate.enabled }}
    ✓ Certificate: {{ include "red-chart.fullname" . }}-cert
+{{- else if eq .Values.routingMode "gatewayapi" }}
+   ✓ Certificate: managed via Gateway annotation (cert-manager.io/cluster-issuer)
 {{- end }}
+
 {{- if .Values.tcpRoute.enabled }}
-   ✓ Traefik TCP Route: {{ include "red-chart.fullname" . }}-tcp-route
+   ✓ Traefik TCP Route: {{ include "red-chart.fullname" . }}-tcp-route → {{ include "red-chart.tcpRouteServiceName" . }}:443
 {{- end }}
 
 🔍 Check the deployment status:
    kubectl get pods -n {{ .Values.namespace.name }}
-   kubectl get certificate -n {{ .Values.gateway.namespace }}
+
+{{- if eq .Values.routingMode "legacy" }}
+   kubectl get gateway -n {{ .Values.gateway.namespace }} {{ .Values.gateway.name }}
+   kubectl get virtualservice -n {{ .Values.namespace.name }}
+{{- else }}
+   kubectl get gateway.gateway.networking.k8s.io -n {{ .Values.gateway.namespace }} {{ .Values.gateway.name }}
+   kubectl get httproute -n {{ .Values.namespace.name }}
+{{- end }}
+
+{{- if .Values.certificate.enabled }}
+   kubectl get certificate -n {{ .Values.gateway.namespace }} {{ include "red-chart.fullname" . }}-cert
+{{- end }}
 
 📊 View application logs:
    kubectl logs -n {{ .Values.namespace.name }} -l app.kubernetes.io/name={{ include "red-chart.name" . }}
 
 ⚠️  Note: Certificate provisioning may take a few minutes.
+{{- if .Values.certificate.enabled }}
    Monitor with: kubectl get certificate -n {{ .Values.gateway.namespace }} {{ include "red-chart.fullname" . }}-cert -w
+{{- else if eq .Values.routingMode "gatewayapi" }}
+   Monitor with: kubectl get secret -n {{ .Values.gateway.namespace }} {{ include "red-chart.fullname" . }}-cert-tls -w
+{{- end }}

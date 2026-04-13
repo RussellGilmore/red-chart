@@ -1,5 +1,18 @@
 # Default values for red-chart
 # This is a YAML-formatted file.
+#
+# Routing Modes:
+# ──────────────
+# This chart supports two routing patterns via the "routingMode" value:
+#
+# "legacy" (default):
+#   Client → Traefik (L4/SNI) → Istio Gateway (TLS term) → VirtualService → Service → Pod
+#   Resources created: Istio Gateway, VirtualService, cert-manager Certificate, IngressRouteTCP
+#
+# "gatewayapi":
+#   Client → Traefik (L4/SNI) → K8s Gateway API Gateway (TLS term) → HTTPRoute → Service → Pod
+#   Resources created: Gateway, HTTPRoute, HTTPRoute (redirect), ReferenceGrant, IngressRouteTCP
+#   Certificate is provisioned via Gateway annotation by default, or explicitly if certificate.enabled=true
 
 # -- Application name
 app:
