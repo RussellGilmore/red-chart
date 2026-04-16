@@ -1,7 +1,8 @@
 # Red Chart
 
 > Modern Helm chart for deploying web applications with Istio service mesh,
-> cert-manager, and Traefik integration.
+> cert-manager, and Traefik integration. Supports both legacy Istio
+> Gateway/VirtualService and Kubernetes Gateway API routing patterns.
 
 [![Helm](https://img.shields.io/badge/Helm-v3.8%2B-blue)](https://helm.sh)
 [![Kubernetes](https://img.shields.io/badge/Kubernetes-v1.24%2B-blue)](https://kubernetes.io)
@@ -19,9 +20,9 @@ allowing you to deploy secure, TLS-enabled applications with a single command.
 
 -   🔒 **Automatic TLS**: Integration with cert-manager for Let's Encrypt
     certificates
--   🕸️ **Service Mesh Ready**: Native Istio support with Gateway and
-    VirtualService
--   🚦 **Traefik Integration**: TCP routing for HTTPS traffic
+-   🕸️ **Dual Routing Modes**: Supports both legacy Istio Gateway/VirtualService
+    and Kubernetes Gateway API with HTTPRoute
+-   🚦 **Traefik Integration**: L4/SNI passthrough routing for HTTPS traffic
 -   🛡️ **Security First**: Pod Security Standards compliant, runs as non-root
 -   📦 **Single Chart, Multiple Apps**: Deploy different applications using the
     same pattern
@@ -48,10 +49,16 @@ helm search repo red-charts
 ### Install the Chart
 
 ```bash
-# Basic installation
+# Basic installation (legacy routing mode)
 helm install my-app red-charts/red-chart \
   --set domain.apex=yourdomain.com \
   --set domain.subdomain=app
+
+# Install with Gateway API routing mode
+helm install my-app red-charts/red-chart \
+  --set domain.apex=yourdomain.com \
+  --set domain.subdomain=app \
+  --set routingMode=gatewayapi
 
 # Install with custom values file
 helm install my-app red-charts/red-chart -f values.yaml
@@ -73,14 +80,16 @@ Before using Red Chart, ensure your cluster has:
 
 -   **Kubernetes 1.24+**
 -   **Helm 3.8+**
--   **Istio 1.20+** (with ingress gateway)
+-   **Istio 1.20+** (with ingress gateway for legacy mode, or Gateway API
+    support for gatewayapi mode)
 -   **cert-manager 1.12+**
 -   **Traefik 2.0+** (as ingress controller)
 -   **ClusterIssuer configured** (default: `letsencrypt-prod`)
+-   **Gateway API CRDs** (required for `routingMode: gatewayapi`)
 
 ## Quick Start Examples
 
-### Deploy a Simple Static Web App
+### Deploy with Legacy Routing (Default)
 
 ```bash
 helm install my-app red-charts/red-chart \
@@ -88,7 +97,22 @@ helm install my-app red-charts/red-chart \
   --set domain.subdomain=app
 ```
 
-This uses the default static HTML content from the chart.
+This uses the default Istio Gateway + VirtualService routing with an explicit
+cert-manager Certificate resource.
+
+### Deploy with Gateway API Routing
+
+```bash
+helm install my-app red-charts/red-chart \
+  --set domain.apex=example.com \
+  --set domain.subdomain=app \
+  --set routingMode=gatewayapi \
+  --set gateway.name=my-app-gateway \
+  --set certificate.enabled=false
+```
+
+This uses the Kubernetes Gateway API with cert-manager annotation-based
+certificate provisioning on the Gateway resource.
 
 ### Deploy with Custom HTML Content
 
@@ -163,7 +187,37 @@ domain:
 
 ## Architecture
 
-This chart uses **Istio Gateway and VirtualService** for routing.
+This chart supports two routing modes. Both share Traefik at the edge for L4/SNI
+passthrough but differ at the service mesh layer.
+
+### Legacy Mode (`routingMode: legacy`)
+
+Uses Istio's own Gateway and VirtualService CRDs. This is the default mode.
+
+```
+Client → Traefik (L4/SNI) → Istio Gateway (TLS term) → VirtualService → Service → Pod
+```
+
+**Resources created:** Istio Gateway, VirtualService, cert-manager Certificate,
+Traefik IngressRouteTCP (targets `istio-ingressgateway`)
+
+### Gateway API Mode (`routingMode: gatewayapi`)
+
+Uses the standard Kubernetes Gateway API with Istio as the implementation.
+
+```
+Client → Traefik (L4/SNI) → K8s Gateway API Gateway (TLS term) → HTTPRoute → Service → Pod
+```
+
+**Resources created:** Gateway (`gateway.networking.k8s.io/v1`), HTTPRoute,
+HTTPRoute (HTTP→HTTPS redirect), ReferenceGrant, Traefik IngressRouteTCP
+(targets `<gateway-name>-istio`)
+
+Certificate is provisioned via the `cert-manager.io/cluster-issuer` Gateway
+annotation by default, or as an explicit Certificate resource if
+`certificate.enabled=true`.
+
+### Detailed Traffic Flow
 
 ```
 ┌─────────────────────────────────────────────────────┐
@@ -172,24 +226,30 @@ This chart uses **Istio Gateway and VirtualService** for routing.
                      │
                      ▼
             ┌─────────────────┐
-            │     Traefik     │  (Layer 4: TCP/SNI)
-            │  Ingress / LB   │
+            │     Traefik     │  (Layer 4: TCP/SNI Passthrough)
+            │   Edge Proxy    │
             └────────┬────────┘
+                     │
+        ┌────────────┴────────────┐
+        │                         │
+        ▼ (legacy)                ▼ (gatewayapi)
+┌───────────────┐        ┌────────────────┐
+│ Istio Gateway │        │ K8s Gateway    │
+│ (istio CRD)   │        │ (gateway API)  │
+│ TLS Term      │        │ TLS Term       │
+└───────┬───────┘        └───────┬────────┘
+        │                        │
+        ▼                        ▼
+┌───────────────┐        ┌────────────────┐
+│VirtualService │        │   HTTPRoute    │
+│ (HTTP routing)│        │ (HTTP routing) │
+└───────┬───────┘        └───────┬────────┘
+        │                        │
+        └────────────┬───────────┘
                      │
                      ▼
             ┌─────────────────┐
-            │  Istio Gateway  │  (Layer 7: TLS Termination)
-            │  (istio-system) │  (cert-manager certificate)
-            └────────┬────────┘
-                     │
-                     ▼
-            ┌─────────────────┐
-            │ VirtualService  │  (HTTP Routing Rules)
-            └────────┬────────┘
-                     │
-                     ▼
-            ┌─────────────────┐
-            │ K8s Service     │  (Load Balancing)
+            │  K8s Service    │  (Load Balancing)
             └────────┬────────┘
                      │
                      ▼
@@ -199,14 +259,6 @@ This chart uses **Istio Gateway and VirtualService** for routing.
             └─────────────────┘
 ```
 
-**Traffic Flow:**
-
-1. Client makes HTTPS request → Traefik (SNI passthrough on port 443)
-2. Traefik → Istio Gateway (TLS termination using cert-manager certificate)
-3. Istio Gateway → VirtualService (HTTP routing based on hostname/path)
-4. VirtualService → Kubernetes Service (ClusterIP)
-5. Service → Application Pods (your containerized app or static content)
-
 ## Configuration
 
 ### Core Parameters
@@ -215,6 +267,7 @@ This chart uses **Istio Gateway and VirtualService** for routing.
 | ------------------ | ------------------------------ | ----------------------------- |
 | `app.name`         | Application name               | `red-app`                     |
 | `app.version`      | Application version            | `1.0.0`                       |
+| `routingMode`      | Routing pattern to use         | `legacy`                      |
 | `namespace.name`   | Kubernetes namespace           | `red-app`                     |
 | `namespace.create` | Create namespace if not exists | `true`                        |
 | `domain.apex`      | Apex domain name               | `rag-space.com`               |
@@ -224,6 +277,13 @@ This chart uses **Istio Gateway and VirtualService** for routing.
 | `image.pullPolicy` | Image pull policy              | `IfNotPresent`                |
 | `imagePullSecrets` | Image pull secrets             | `[]`                          |
 | `replicaCount`     | Number of replicas             | `1`                           |
+
+### Routing Mode
+
+| Value        | Description                                                              |
+| ------------ | ------------------------------------------------------------------------ |
+| `legacy`     | Istio Gateway + VirtualService (default, targets `istio-ingressgateway`) |
+| `gatewayapi` | K8s Gateway API + HTTPRoute (targets `<gateway-name>-istio`)             |
 
 ### Content Configuration
 
@@ -237,14 +297,24 @@ containerized applications.
 
 ### Gateway & Certificates
 
-| Parameter              | Description          | Default            |
-| ---------------------- | -------------------- | ------------------ |
-| `gateway.name`         | Istio Gateway name   | `red-app-gateway`  |
-| `gateway.namespace`    | Gateway namespace    | `istio-system`     |
-| `certificate.enabled`  | Enable cert-manager  | `true`             |
-| `certificate.issuer`   | ClusterIssuer name   | `letsencrypt-prod` |
-| `certificate.duration` | Certificate validity | `2160h` (90 days)  |
-| `tcpRoute.enabled`     | Enable Traefik route | `true`             |
+| Parameter              | Description                                | Default            |
+| ---------------------- | ------------------------------------------ | ------------------ |
+| `gateway.name`         | Gateway resource name                      | `red-app-gateway`  |
+| `gateway.namespace`    | Gateway namespace                          | `istio-system`     |
+| `gateway.className`    | GatewayClass name (gatewayapi mode only)   | `istio`            |
+| `gateway.annotations`  | Gateway annotations (gatewayapi mode only) | see values.yaml    |
+| `certificate.enabled`  | Create explicit Certificate resource       | `true`             |
+| `certificate.issuer`   | ClusterIssuer name                         | `letsencrypt-prod` |
+| `certificate.duration` | Certificate validity                       | `2160h` (90 days)  |
+| `tcpRoute.enabled`     | Enable Traefik TCP route                   | `true`             |
+
+#### Certificate Behavior by Mode
+
+| Mode         | `certificate.enabled` | Behavior                                                        |
+| ------------ | --------------------- | --------------------------------------------------------------- |
+| `legacy`     | `true` (required)     | Creates an explicit cert-manager Certificate resource           |
+| `gatewayapi` | `true`                | Creates an explicit Certificate; no annotation on Gateway       |
+| `gatewayapi` | `false`               | No Certificate resource; Gateway annotation provisions the cert |
 
 ### Resources & Security
 
@@ -258,6 +328,63 @@ containerized applications.
 | `podSecurityContext.fsGroup`         | Volume ownership GID | `101`   |
 
 For a complete list of configuration options, see [values.yaml](values.yaml).
+
+## Example Values Files
+
+### Legacy Mode (Istio Gateway + VirtualService)
+
+```yaml
+# values-legacy.yaml
+routingMode: legacy
+
+app:
+    name: red-app
+
+namespace:
+    name: red-app
+    create: true
+
+domain:
+    apex: rag-space.com
+    subdomain: red-app
+
+gateway:
+    name: red-app-gateway
+    namespace: istio-system
+
+certificate:
+    enabled: true
+    issuer: letsencrypt-prod
+```
+
+### Gateway API Mode (K8s Gateway + HTTPRoute)
+
+```yaml
+# values-gatewayapi.yaml
+routingMode: gatewayapi
+
+app:
+    name: red-test
+
+namespace:
+    name: red-test
+    create: true
+
+domain:
+    apex: rag-space.com
+    subdomain: red-test
+
+gateway:
+    name: red-test-gateway
+    namespace: istio-system
+    className: istio
+    annotations:
+        cert-manager.io/cluster-issuer: letsencrypt-prod
+        networking.istio.io/service-type: ClusterIP
+
+certificate:
+    enabled: false
+```
 
 ## Advanced Usage
 
@@ -298,24 +425,50 @@ helm install my-app red-charts/red-chart -f values-production.yaml
 ### Multi-Environment Deployments
 
 ```bash
-# Development
+# Development (Gateway API)
 helm install my-app-dev red-charts/red-chart \
   -f values-dev.yaml \
+  --set routingMode=gatewayapi \
   --namespace dev \
   --create-namespace
 
-# Staging
+# Staging (Gateway API)
 helm install my-app-staging red-charts/red-chart \
   -f values-staging.yaml \
+  --set routingMode=gatewayapi \
   --namespace staging \
   --create-namespace
 
-# Production
+# Production (Legacy — proven stable)
 helm install my-app-prod red-charts/red-chart \
   -f values-production.yaml \
+  --set routingMode=legacy \
   --namespace production \
   --create-namespace
 ```
+
+### Migrating from Legacy to Gateway API
+
+To migrate an existing deployment from legacy to Gateway API mode:
+
+1. Deploy a test instance with `routingMode: gatewayapi` on a separate subdomain
+   to validate the Gateway API flow works in your cluster.
+2. Once validated, update your production values to `routingMode: gatewayapi`.
+3. Run `helm upgrade` — this will replace the Istio Gateway and VirtualService
+   with the Gateway API Gateway, HTTPRoute, and ReferenceGrant resources.
+4. The Traefik IngressRouteTCP will automatically update its target from
+   `istio-ingressgateway` to `<gateway-name>-istio`.
+
+```bash
+helm upgrade my-app red-charts/red-chart \
+  -f values.yaml \
+  --set routingMode=gatewayapi \
+  --set certificate.enabled=false
+```
+
+**Note:** During the upgrade there will be a brief period where the old routing
+resources are removed and the new ones are created. Plan for a short window of
+downtime or perform the migration during a maintenance window.
 
 ### Upgrading
 
@@ -330,7 +483,7 @@ helm search repo red-charts/red-chart --versions
 helm upgrade my-app red-charts/red-chart
 
 # Upgrade to specific version
-helm upgrade my-app red-charts/red-chart --version 0.1.2
+helm upgrade my-app red-charts/red-chart --version 0.2.1
 
 # Upgrade with new values
 helm upgrade my-app red-charts/red-chart -f values.yaml
@@ -352,9 +505,12 @@ kubectl delete namespace my-namespace
 ### Certificate Not Issued
 
 ```bash
-# Check certificate status
+# Check certificate status (legacy mode or gatewayapi with certificate.enabled=true)
 kubectl get certificate -n istio-system
 kubectl describe certificate <release-name>-cert -n istio-system
+
+# Check if annotation-based provisioning worked (gatewayapi mode)
+kubectl get secret -n istio-system <release-name>-cert-tls
 
 # Check cert-manager logs
 kubectl logs -n cert-manager deployment/cert-manager
@@ -364,7 +520,7 @@ kubectl get clusterissuer letsencrypt-prod
 kubectl describe clusterissuer letsencrypt-prod
 ```
 
-### Gateway Not Working
+### Gateway Not Working (Legacy Mode)
 
 ```bash
 # Check Istio gateway
@@ -380,12 +536,39 @@ kubectl get virtualservice -n <namespace>
 kubectl describe virtualservice <vs-name> -n <namespace>
 ```
 
+### Gateway Not Working (Gateway API Mode)
+
+```bash
+# Check Gateway API Gateway
+kubectl get gateway.gateway.networking.k8s.io -n istio-system
+kubectl describe gateway.gateway.networking.k8s.io <gateway-name> -n istio-system
+
+# Check the auto-created gateway service
+kubectl get svc -n istio-system <gateway-name>-istio
+
+# Check HTTPRoutes
+kubectl get httproute -n <namespace>
+kubectl describe httproute <route-name> -n <namespace>
+
+# Check ReferenceGrant
+kubectl get referencegrant -n istio-system
+
+# Verify Gateway API CRDs are installed
+kubectl get crd gateways.gateway.networking.k8s.io
+kubectl get crd httproutes.gateway.networking.k8s.io
+```
+
 ### Traefik Routing Issues
 
 ```bash
 # Check IngressRouteTCP
 kubectl get ingressroutetcp -n istio-system
 kubectl describe ingressroutetcp <route-name> -n istio-system
+
+# Verify the TCP route target service exists
+# Legacy: istio-ingressgateway
+# Gateway API: <gateway-name>-istio
+kubectl get svc -n istio-system
 
 # Verify Traefik logs
 kubectl logs -n traefik deployment/traefik
@@ -405,6 +588,36 @@ kubectl logs -n <namespace> <pod-name>
 kubectl get events -n <namespace> --sort-by='.lastTimestamp'
 ```
 
+## Resources Created by Mode
+
+### Legacy Mode
+
+| Resource        | API Group           | Namespace     | Purpose                  |
+| --------------- | ------------------- | ------------- | ------------------------ |
+| Namespace       | v1                  | —             | Application namespace    |
+| Deployment      | apps/v1             | app namespace | Application pods         |
+| Service         | v1                  | app namespace | ClusterIP load balancing |
+| ConfigMap       | v1                  | app namespace | Static HTML content      |
+| Gateway         | networking.istio.io | istio-system  | TLS termination          |
+| VirtualService  | networking.istio.io | app namespace | HTTP routing             |
+| Certificate     | cert-manager.io     | istio-system  | TLS certificate          |
+| IngressRouteTCP | traefik.io          | istio-system  | L4/SNI passthrough       |
+
+### Gateway API Mode
+
+| Resource        | API Group                 | Namespace     | Purpose                    |
+| --------------- | ------------------------- | ------------- | -------------------------- |
+| Namespace       | v1                        | —             | Application namespace      |
+| Deployment      | apps/v1                   | app namespace | Application pods           |
+| Service         | v1                        | app namespace | ClusterIP load balancing   |
+| ConfigMap       | v1                        | app namespace | Static HTML content        |
+| Gateway         | gateway.networking.k8s.io | istio-system  | TLS termination            |
+| HTTPRoute       | gateway.networking.k8s.io | app namespace | HTTP routing               |
+| HTTPRoute       | gateway.networking.k8s.io | app namespace | HTTP→HTTPS redirect        |
+| ReferenceGrant  | gateway.networking.k8s.io | istio-system  | Cross-namespace references |
+| Certificate     | cert-manager.io           | istio-system  | TLS cert (if enabled)      |
+| IngressRouteTCP | traefik.io                | istio-system  | L4/SNI passthrough         |
+
 ## Chart Versions
 
 To see all available versions:
@@ -412,6 +625,11 @@ To see all available versions:
 ```bash
 helm search repo red-charts/red-chart --versions
 ```
+
+| Version | Changes                                         |
+| ------- | ----------------------------------------------- |
+| 0.2.1   | Dual routing mode support (legacy + gatewayapi) |
+| 0.1.3   | Initial release with legacy Istio routing       |
 
 ## Development
 
@@ -422,22 +640,36 @@ helm search repo red-charts/red-chart --versions
 git clone https://github.com/RussellGilmore/red-chart.git
 cd red-chart
 
-# Test the chart
-helm lint .
+# Lint both routing modes
+helm lint charts/red-chart -f charts/red-chart/ci/legacy-values.yaml
+helm lint charts/red-chart -f charts/red-chart/ci/gatewayapi-values.yaml
 
-# Dry-run install
-helm install test-release . --dry-run --debug
+# Dry-run template for legacy mode
+helm template test charts/red-chart -f charts/red-chart/ci/legacy-values.yaml
 
-# Install locally
-helm install test-release .
+# Dry-run template for Gateway API mode
+helm template test charts/red-chart -f charts/red-chart/ci/gatewayapi-values.yaml
+
+# Verify resource isolation between modes
+helm template test charts/red-chart --set routingMode=legacy | grep "^kind:" | sort
+helm template test charts/red-chart --set routingMode=gatewayapi | grep "^kind:" | sort
 ```
+
+### CI Test Values
+
+The `charts/red-chart/ci/` directory contains values files used for lint
+testing:
+
+-   `legacy-values.yaml` — validates legacy Istio routing mode
+-   `gatewayapi-values.yaml` — validates Kubernetes Gateway API routing mode
 
 ### Making Changes
 
 1. Make your changes to the chart
 2. Bump the version in `Chart.yaml`
-3. Commit and push to `main` branch
-4. GitHub Actions will automatically package and publish the new version
+3. Lint and template both routing modes
+4. Commit and push to `main` branch
+5. GitHub Actions will automatically package and publish the new version
 
 ## Contributing
 
