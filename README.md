@@ -688,7 +688,7 @@ for details.
 
 ## Maintainers
 
--   Russell Gilmore - [ragilmore775@gmail.com](mailto:ragilmore775@gmail.com)
+-   Russell Gilmore - [Russell.Gilmore@pm.me](mailto:Russell.Gilmore@pm.me)
 
 ## Links
 
