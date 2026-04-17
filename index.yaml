@@ -2,6 +2,46 @@ apiVersion: v1
 entries:
   red-chart:
   - annotations:
+      artifacthub.io/changes: |
+        - kind: added
+          description: Dual routing mode support (legacy Istio and Kubernetes Gateway API)
+        - kind: added
+          description: HTTPRoute and HTTP-to-HTTPS redirect for Gateway API mode
+        - kind: added
+          description: ReferenceGrant for cross-namespace Gateway API routing
+        - kind: added
+          description: Annotation-based cert-manager provisioning for Gateway API mode
+      artifacthub.io/license: MIT
+      category: Web Applications
+    apiVersion: v2
+    appVersion: 1.0.0
+    created: "2026-04-17T19:57:14.953381547Z"
+    description: A Helm chart for deploying web applications with dual routing support
+      — Istio Gateway/VirtualService (legacy) and Kubernetes Gateway API/HTTPRoute
+      — with cert-manager TLS and Traefik integration
+    digest: 13f844d9236590cf99a42c740ee6c24aa007b5f1ce3f5afb0abb9548583eba81
+    home: https://github.com/RussellGilmore/red-chart
+    keywords:
+    - istio
+    - traefik
+    - cert-manager
+    - gateway-api
+    - kubernetes-gateway
+    - nginx
+    - web-app
+    - service-mesh
+    kubeVersion: '>=1.24.0-0'
+    maintainers:
+    - email: Russell.Gilmore@pm.me
+      name: Russell Gilmore
+    name: red-chart
+    sources:
+    - https://github.com/RussellGilmore/red-chart
+    type: application
+    urls:
+    - https://github.com/RussellGilmore/red-chart/releases/download/red-chart-1.0.0/red-chart-1.0.0.tgz
+    version: 1.0.0
+  - annotations:
       category: Web Applications
     apiVersion: v2
     appVersion: 1.0.0
@@ -53,4 +93,4 @@ entries:
     urls:
     - https://github.com/RussellGilmore/red-chart/releases/download/red-chart-0.1.2/red-chart-0.1.2.tgz
     version: 0.1.2
-generated: "2026-02-18T15:20:58.298119493Z"
+generated: "2026-04-17T19:57:14.953392908Z"
