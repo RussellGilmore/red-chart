@@ -1,12 +1,12 @@
 apiVersion: v2
 name: red-chart
-description: A Helm chart for deploying web applications with Istio service mesh, cert-manager, and Traefik integration
+description: A Helm chart for deploying web applications with dual routing support — Istio Gateway/VirtualService (legacy) and Kubernetes Gateway API/HTTPRoute — with cert-manager TLS and Traefik integration
 type: application
-version: 0.1.3
+version: 1.0.0
 appVersion: "1.0.0"
-home: https://github.com/RussellGilmore/red-charts
+home: https://github.com/RussellGilmore/red-chart
 sources:
-  - https://github.com/RussellGilmore/red-charts
+  - https://github.com/RussellGilmore/red-chart
 maintainers:
   - name: Russell Gilmore
     email: Russell.Gilmore@pm.me
@@ -14,8 +14,21 @@ keywords:
   - istio
   - traefik
   - cert-manager
+  - gateway-api
+  - kubernetes-gateway
   - nginx
   - web-app
+  - service-mesh
 annotations:
   category: Web Applications
+  artifacthub.io/changes: |
+    - kind: added
+      description: Dual routing mode support (legacy Istio and Kubernetes Gateway API)
+    - kind: added
+      description: HTTPRoute and HTTP-to-HTTPS redirect for Gateway API mode
+    - kind: added
+      description: ReferenceGrant for cross-namespace Gateway API routing
+    - kind: added
+      description: Annotation-based cert-manager provisioning for Gateway API mode
+  artifacthub.io/license: MIT
 kubeVersion: ">=1.24.0-0"
